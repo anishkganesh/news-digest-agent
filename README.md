@@ -1,4 +1,4 @@
-# News automation agent
+# news-digest-agent
 
 A conversational news-digest prototype that lets a reader choose sources and delivery preferences, summarizes scraped content, and sends email digests.
 
