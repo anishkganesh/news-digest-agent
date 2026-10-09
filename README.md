@@ -35,8 +35,8 @@ Python, FastAPI, Pydantic, Uvicorn, OpenAI, Firecrawl, Resend, pytz, and browser
 Create and activate a Python virtual environment:
 
 ```bash
-git clone https://github.com/anishkganesh/news-automation-agent.git
-cd news-automation-agent
+git clone https://github.com/anishkganesh/news-digest-agent.git
+cd news-digest-agent
 python -m venv .venv
 pip install -r requirements.txt
 ```
