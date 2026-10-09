@@ -1,133 +1,98 @@
-# News Automation Agent
+# News automation agent
 
-An AI-powered news digest service that automatically crawls Medium, Google News, and book summary sites to deliver personalized daily email digests. Features a minimalist UI with just one text input that uses OpenAI to understand natural language commands.
+A conversational news-digest prototype that lets a reader choose sources and delivery preferences, summarizes scraped content, and sends email digests.
+
+## Overview
+
+A static React interface talks to a FastAPI backend. OpenAI parses setup messages and generates summaries, Firecrawl retrieves source content, and Resend sends email. User preferences are stored in a local JSON file.
 
 ## Features
 
-- 🤖 **AI-Powered Interface**: Single text input that understands natural language
-- 📰 **Multiple Sources**: Crawls Medium (AI/productivity), Google News (tech/business/world), and book summaries
-- 📧 **Daily Email Digests**: Automated emails with bullet-point summaries
-- 🌍 **Timezone Support**: Set your preferred delivery time and timezone
-- 🎯 **Customizable**: Add/remove sources, change delivery times
-- 🚀 **Serverless**: Runs on Vercel with automatic scaling
+- Conversational source addition/removal with URL confirmation.
+- Delivery-time and timezone preferences.
+- Source-list review and unsubscribe handling.
+- AI-assisted source scraping/summarization and digest composition.
+- Immediate test delivery and a scheduled-delivery endpoint.
 
-## Quick Start
+## Architecture
 
-### 1. Clone and Install
+The frontend posts email and messages to `/api/process`. The backend reads/writes `users.json`, parses intent with OpenAI, and updates the corresponding preferences. Digest routes scrape the configured sources, compose HTML, and call Resend. The cron handler compares the current time in each user's timezone with their configured delivery minute.
+
+## Tech stack
+
+Python, FastAPI, Pydantic, Uvicorn, OpenAI, Firecrawl, Resend, pytz, and browser React loaded by the static HTML page. There is no frontend bundling pipeline.
+
+## Project structure
+
+- `api/app.py` — API, intent parsing, preferences, scraping, and delivery.
+- `index.html` — static conversational frontend.
+- `requirements.txt` — backend dependency versions.
+- `vercel.json` — static/Python routing and cron configuration.
+- `DEPLOY_INSTRUCTIONS.md` — additional deployment notes.
+
+## Run locally
+
+Create and activate a Python virtual environment:
 
 ```bash
 git clone https://github.com/anishkganesh/news-automation-agent.git
 cd news-automation-agent
+python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Set Up API Keys
+Create a root `.env`:
 
-Create a `.env` file:
-
-```bash
-OPENAI_API_KEY=your_openai_api_key
-FIRECRAWL_API_KEY=your_firecrawl_api_key
-RESEND_API_KEY=your_resend_api_key  # Optional for email sending
+```dotenv
+OPENAI_API_KEY=your-openai-key
+FIRECRAWL_API_KEY=your-firecrawl-key
+RESEND_API_KEY=your-resend-key
 ```
 
-**Get your API keys:**
-- OpenAI: https://platform.openai.com/api-keys
-- Firecrawl: https://firecrawl.dev
-- Resend: https://resend.com (free tier available)
-
-### 3. Local Development
+Start the backend from the repository root:
 
 ```bash
 python api/app.py
 ```
 
-Open `index.html` in your browser or serve it locally.
+It listens on port 8000. In another terminal, serve the root page:
 
-### 4. Deploy to Vercel
+```bash
+python -m http.server 8001
+```
 
-1. Install Vercel CLI: `npm i -g vercel`
-2. Set up environment variables in Vercel:
-   ```bash
-   vercel env add OPENAI_API_KEY
-   vercel env add FIRECRAWL_API_KEY
-   vercel env add RESEND_API_KEY
-   ```
-3. Deploy:
-   ```bash
-   vercel
-   ```
+Open `http://localhost:8001`. The page detects `localhost` and calls `http://localhost:8000/api`; use this hostname for the documented local setup.
+
+## Configuration and data
+
+`users.json` is created in the current working directory and contains email, source, timezone, and delivery settings. It is not a database and has no concurrent-write coordination.
+
+OpenAI calls request `gpt-3.5-turbo` in this snapshot. Confirm model/provider compatibility with the committed client versions before use. Resend currently uses its onboarding/test sender; public delivery needs an appropriately configured sender/domain and provider permissions.
+
+The Vercel cron expression is `* * * * *` — **every minute**, not hourly. The endpoint sends only when a user's local hour/minute matches the preference. There is no durable delivery ledger or deduplication, so repeated requests in that minute can send duplicates.
 
 ## Usage
 
-1. **First Visit**: Enter your email address
-2. **Commands**: Use natural language like:
-   - "add medium" or "subscribe to medium articles"
-   - "remove google news tech" 
-   - "change time to 9:00 AM"
-   - "set timezone to America/New_York"
-   - "view my sources"
-   - "unsubscribe"
+Enter an email, add source URLs or names, confirm the URL, and set time/timezone preferences. Review sources or unsubscribe through the conversational interface. Test-digest actions send actual email; use an address you control.
 
-## Architecture
+API routes are `POST /api/process`, `GET /api/test-digest/{email}`, and `GET /api/cron/send-digests`. The backend root returns an API welcome response.
 
-- **Frontend**: Single HTML file with React (no build step)
-- **Backend**: FastAPI (2 Python files)
-- **Storage**: JSON file (upgradeable to database)
-- **Email**: Resend API
-- **Scraping**: Firecrawl API
-- **AI**: OpenAI GPT-3.5
+## Validation
 
-## Available Sources
+No automated tests are configured; `npm test` is only the default failing placeholder. Verify preference updates, URL confirmation, timezone matching, provider errors, and one controlled delivery. This documentation review did not send email or run paid API calls.
 
-- `medium`: AI and productivity articles from Medium
-- `google_news_tech`: Technology news from Google News
-- `google_news_business`: Business news from Google News
-- `google_news_world`: World news from Google News
-- `book_summaries`: Self-help book summaries and quotes
+## Deployment
 
-## API Endpoints
+`vercel.json` maps API requests to the Python app and other requests to the HTML page. Configure service keys and a scheduler allowed by the chosen hosting plan. Local `users.json` persistence is unsuitable as shared durable storage in a serverless deployment; production requires an external store and delivery coordination.
 
-- `POST /api/process`: Process user commands
-- `GET /api/test-digest/{email}`: Send test digest immediately
-- `GET /api/cron/send-digests`: Cron endpoint for scheduled sends
+## Limitations
 
-## Email Setup with Resend
+- There is no complete authentication boundary for preference updates or delivery routes.
+- Public delivery/cron endpoints need access controls before exposure.
+- Filesystem persistence and exact-minute scheduling are fragile in multi-instance environments.
+- Scraping can fail, and generated summaries can be incorrect.
+- Email failures are logged inside the sender function, so a route response does not guarantee inbox delivery.
 
-1. Sign up at [resend.com](https://resend.com)
-2. Verify your domain or use their test domain
-3. Get your API key from the dashboard
-4. Add it to your environment variables
+## Attribution and license
 
-## Customization
-
-### Adding New Sources
-
-Edit `AVAILABLE_SOURCES` in `api/app.py`:
-
-```python
-"source_name": {
-    "url": "https://example.com", 
-    "topics": ["topic1", "topic2"]
-}
-```
-
-### Modifying Email Template
-
-Update the `create_digest()` function in `api/app.py` to customize the email format.
-
-## Environment Variables
-
-- `OPENAI_API_KEY`: Required for AI parsing and content formatting
-- `FIRECRAWL_API_KEY`: Required for web scraping
-- `RESEND_API_KEY`: Required for sending emails (get free at resend.com)
-
-## Notes
-
-- The cron job runs every hour and checks which users need their digest sent
-- User data is stored in `users.json` (gitignored for privacy)
-- For production, consider using a proper database instead of JSON file
-
-## License
-
-MIT 
+`package.json` contains an ISC label, but no standalone license file is included. Provider services and dependencies retain their own terms.
